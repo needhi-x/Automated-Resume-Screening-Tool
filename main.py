@@ -1,227 +1,180 @@
 import os
 import re
 import pandas as pd
-import pdfplumber
-import docx
 import matplotlib.pyplot as plt
+import pdfplumber
 
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
-
-
-# -------------------------------
-# TEXT CLEANING
-# -------------------------------
+# -----------------------------
+# CLEAN TEXT
+# -----------------------------
 def clean_text(text):
-    if not text:
-        return ""
-    
     text = text.lower()
-    text = re.sub(r'[^a-zA-Z\s]', ' ', text)
+    text = re.sub(r'[^a-zA-Z0-9\s]', ' ', text)
     text = re.sub(r'\s+', ' ', text)
     return text.strip()
 
-
-# -------------------------------
-# LOAD JOB DESCRIPTION
-# -------------------------------
-def load_job_description():
-    file_path = "data/sample_job_description.txt"
-
-    try:
-        with open(file_path, "r", encoding="utf-8") as f:
-            text = f.read()
-            cleaned = clean_text(text)
-
-            # 🔥 PRO BOOST: Add important keywords
-            boost = " python machine learning data analysis sql pandas numpy scikit learn deep learning ai"
-            return cleaned + boost
-
-    except:
-        print("❌ Job description file not found!")
-        return ""
-
-
-# -------------------------------
-# PDF TEXT EXTRACTION
-# -------------------------------
-def extract_text_from_pdf(file_path):
+# -----------------------------
+# READ PDF
+# -----------------------------
+def read_pdf(file_path):
     text = ""
     try:
         with pdfplumber.open(file_path) as pdf:
             for page in pdf.pages:
                 text += page.extract_text() or ""
-    except:
-        print(f"❌ Error reading PDF: {file_path}")
+    except Exception as e:
+        print("Error reading:", file_path, "|", e)
     return text
 
+# -----------------------------
+# SKILLS
+# -----------------------------
+core_skills = ["python", "machine learning", "sql"]
+tools = ["excel", "power bi", "tableau"]
+libraries = ["pandas", "numpy", "matplotlib", "seaborn", "scikit learn", "tensorflow", "keras"]
 
-# -------------------------------
-# DOCX TEXT EXTRACTION
-# -------------------------------
-def extract_text_from_docx(file_path):
+all_skills = core_skills + tools + libraries
+
+# -----------------------------
+# EXTRACT SKILLS
+# -----------------------------
+def extract_skills(text):
+    return [skill for skill in all_skills if skill in text]
+
+# -----------------------------
+# EXPERIENCE BONUS
+# -----------------------------
+def experience_score(text):
+    keywords = ["experience", "years", "worked", "internship", "project"]
+    return sum(1 for word in keywords if word in text)
+
+# -----------------------------
+# PATHS
+# -----------------------------
+resume_folder = r"C:\Users\neha\OneDrive\Desktop\Python\Automated-Resume-Screening-Tool\data\sample_resumes"
+output_folder = r"C:\Users\neha\OneDrive\Desktop\Python\Automated-Resume-Screening-Tool\sample_outputs"
+
+os.makedirs(output_folder, exist_ok=True)
+
+# -----------------------------
+# PROCESS FILES
+# -----------------------------
+results = []
+files = os.listdir(resume_folder)
+
+print("Files found:", files)
+
+for file in files:
+    file_path = os.path.join(resume_folder, file)
+    print("Processing:", file)
+
     text = ""
-    try:
-        doc = docx.Document(file_path)
-        for para in doc.paragraphs:
-            text += para.text + "\n"
-    except:
-        print(f"❌ Error reading DOCX: {file_path}")
-    return text
 
+    if file.endswith(".pdf"):
+        text = read_pdf(file_path)
+    elif file.endswith(".txt"):
+        with open(file_path, "r", encoding="utf-8") as f:
+            text = f.read()
+    else:
+        continue
 
-# -------------------------------
-# FILE HANDLER
-# -------------------------------
-def extract_resume_text(file_path):
-    if file_path.endswith(".pdf"):
-        return extract_text_from_pdf(file_path)
-    elif file_path.endswith(".docx"):
-        return extract_text_from_docx(file_path)
-    return ""
+    text = clean_text(text)
 
+    if len(text) == 0:
+        print("Empty content:", file)
+        continue
 
-# -------------------------------
-# MATCHED SKILLS
-# -------------------------------
-def get_top_keywords(job_desc, resume, top_n=5):
-    job_words = set(job_desc.split())
-    resume_words = set(resume.split())
-    matched = job_words.intersection(resume_words)
-    return list(matched)[:top_n]
+    matched = extract_skills(text)
 
+    # -----------------------------
+    # SCORING
+    # -----------------------------
+    score = 0
+    for skill in matched:
+        if skill in core_skills:
+            score += 3
+        elif skill in tools:
+            score += 2
+        elif skill in libraries:
+            score += 1
 
-# -------------------------------
-# TF-IDF + SIMILARITY
-# -------------------------------
-def calculate_scores(job_desc, resumes):
-    vectorizer = TfidfVectorizer(
-        stop_words='english',
-        ngram_range=(1, 3),   # 🔥 better phrase matching
-        max_features=5000
-    )
-    all_text = [job_desc] + resumes
-    vectors = vectorizer.fit_transform(all_text)
-    return cosine_similarity(vectors[0:1], vectors[1:]).flatten()
+    score += experience_score(text)
 
+    match_percent = round((len(matched) / len(all_skills)) * 100, 2)
 
-# -------------------------------
-# MAIN FUNCTION
-# -------------------------------
-def main():
-    resume_folder = "sample_data/"
-    output_folder = "sample_outputs/"
-
-    if not os.path.exists(resume_folder):
-        print("❌ sample_data folder not found!")
-        return
-
-    files = [f for f in os.listdir(resume_folder) if f.endswith((".pdf", ".docx"))]
-
-    if len(files) == 0:
-        print("❌ No resumes found!")
-        return
-
-    # Load job description
-    job_desc = load_job_description()
-
-    if job_desc == "":
-        return
-
-    resumes = []
-    names = []
-
-    # Read resumes
-    for file in files:
-        path = os.path.join(resume_folder, file)
-        text = extract_resume_text(path)
-        cleaned = clean_text(text)
-
-        if cleaned == "":
-            print(f"⚠️ Empty resume: {file}")
-
-        resumes.append(cleaned)
-        names.append(file)
-
-    # Calculate similarity
-    scores = calculate_scores(job_desc, resumes)
-
-    # Matched skills
-    keywords_list = [
-        ", ".join(get_top_keywords(job_desc, r)) for r in resumes
-    ]
-
-    # DataFrame
-    df = pd.DataFrame({
-        "Resume": names,
-        "Score": scores,
-        "Matched Skills": keywords_list
+    results.append({
+        "Resume": file,
+        "Score": score,
+        "Match_Percent": match_percent,
+        "Skills": ", ".join(matched)
     })
 
-    # Sort
-    df = df.sort_values(by="Score", ascending=False).reset_index(drop=True)
+# -----------------------------
+# CHECK
+# -----------------------------
+if len(results) == 0:
+    print("No resumes processed")
+    exit()
 
-    # Rank
-    df["Rank"] = df.index + 1
+df = pd.DataFrame(results)
 
-    # Convert to %
-    df["Score (%)"] = (df["Score"] * 100).round(2)
+# -----------------------------
+# SORT + RANK
+# -----------------------------
+df = df.sort_values(by="Score", ascending=False).reset_index(drop=True)
+df["Rank"] = df.index + 1
 
-    # -------------------------------
-    # 🔥 SMART SHORTLIST LOGIC
-    # -------------------------------
-    threshold = 0.05  # lowered threshold
+# -----------------------------
+# STATUS (FIXED LOGIC)
+# -----------------------------
+df["Status"] = "Rejected"
 
-    df["Status"] = df["Score"].apply(
-        lambda x: "Shortlisted" if x >= threshold else "Rejected"
-    )
+n = len(df)
 
-    # ✅ Ensure at least top candidates are shortlisted
-    if (df["Status"] == "Shortlisted").sum() == 0:
-        print("⚠️ No one met threshold → forcing Top 3 as shortlisted")
-        df.loc[:2, "Status"] = "Shortlisted"
+selected_count = max(1, int(n * 0.2))
+shortlisted_count = max(1, int(n * 0.5))
 
-    print("\n📊 FINAL RESULTS:\n")
-    print(df)
+df.loc[:selected_count-1, "Status"] = "Selected"
 
-    # -------------------------------
-    # OUTPUTS
-    # -------------------------------
-    os.makedirs(output_folder, exist_ok=True)
+end_shortlist = min(n, selected_count + shortlisted_count)
+df.loc[selected_count:end_shortlist-1, "Status"] = "Shortlisted"
 
-    # Graph
-    try:
-        plt.figure()
-        plt.bar(df["Resume"], df["Score"])
-        plt.xlabel("Resumes")
-        plt.ylabel("Similarity Score")
-        plt.title("Resume Screening Scores")
-        plt.xticks(rotation=45)
-        plt.tight_layout()
-        plt.savefig(os.path.join(output_folder, "score_chart.png"))
-        plt.close()
-    except:
-        print("⚠️ Graph not generated")
+# -----------------------------
+# FILTER FILES
+# -----------------------------
+selected_df = df[df["Status"] == "Selected"]
+shortlisted_df = df[df["Status"] == "Shortlisted"]
 
-    # Save all results
-    df.to_csv(os.path.join(output_folder, "results.csv"), index=False)
+# -----------------------------
+# TOP CANDIDATES
+# -----------------------------
+top_candidates_df = df.head(2)
 
-    # Shortlisted
-    shortlisted = df[df["Status"] == "Shortlisted"]
-    shortlisted.to_csv(os.path.join(output_folder, "shortlisted.csv"), index=False)
+# -----------------------------
+# SAVE FILES
+# -----------------------------
+df.to_csv(os.path.join(output_folder, "all_results.csv"), index=False)
+selected_df.to_csv(os.path.join(output_folder, "selected.csv"), index=False)
+shortlisted_df.to_csv(os.path.join(output_folder, "shortlisted.csv"), index=False)
+top_candidates_df.to_csv(os.path.join(output_folder, "top_candidates.csv"), index=False)
 
-    # Top candidates
-    top_n = min(3, len(df))
-    top_candidates = df.head(top_n)
-    top_candidates.to_csv(os.path.join(output_folder, "top_candidates.csv"), index=False)
+# -----------------------------
+# GRAPH
+# -----------------------------
+plt.figure()
+plt.bar(df["Resume"], df["Score"])
+plt.xticks(rotation=45)
+plt.title("Resume Score Comparison")
+plt.tight_layout()
+plt.savefig(os.path.join(output_folder, "score_chart.png"))
 
-    print("\n🏆 Top Candidates Saved!")
-    print(f"\n📁 Files saved in: {output_folder}")
-    print("\n✅ ALL DONE!")
-
-
-# -------------------------------
-# RUN
-# -------------------------------
-if __name__ == "__main__":
-    main()
+# -----------------------------
+# DONE
+# -----------------------------
+print("\nATS SYSTEM COMPLETED SUCCESSFULLY")
+print("Outputs saved in:", output_folder)
+print("all_results.csv")
+print("selected.csv")
+print("shortlisted.csv")
+print("top_candidates.csv")
+print("score_chart.png")
