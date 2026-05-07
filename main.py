@@ -15,10 +15,31 @@ from sklearn.metrics.pairwise import cosine_similarity
 def clean_text(text):
     if not text:
         return ""
+    
     text = text.lower()
     text = re.sub(r'[^a-zA-Z\s]', ' ', text)
     text = re.sub(r'\s+', ' ', text)
     return text.strip()
+
+
+# -------------------------------
+# LOAD JOB DESCRIPTION
+# -------------------------------
+def load_job_description():
+    file_path = "data/sample_job_description.txt"
+
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            text = f.read()
+            cleaned = clean_text(text)
+
+            # 🔥 PRO BOOST: Add important keywords
+            boost = " python machine learning data analysis sql pandas numpy scikit learn deep learning ai"
+            return cleaned + boost
+
+    except:
+        print("❌ Job description file not found!")
+        return ""
 
 
 # -------------------------------
@@ -74,7 +95,11 @@ def get_top_keywords(job_desc, resume, top_n=5):
 # TF-IDF + SIMILARITY
 # -------------------------------
 def calculate_scores(job_desc, resumes):
-    vectorizer = TfidfVectorizer(stop_words='english', ngram_range=(1, 2))
+    vectorizer = TfidfVectorizer(
+        stop_words='english',
+        ngram_range=(1, 3),   # 🔥 better phrase matching
+        max_features=5000
+    )
     all_text = [job_desc] + resumes
     vectors = vectorizer.fit_transform(all_text)
     return cosine_similarity(vectors[0:1], vectors[1:]).flatten()
@@ -84,10 +109,11 @@ def calculate_scores(job_desc, resumes):
 # MAIN FUNCTION
 # -------------------------------
 def main():
-    resume_folder = "resumes/"
+    resume_folder = "sample_data/"
+    output_folder = "sample_outputs/"
 
     if not os.path.exists(resume_folder):
-        print("❌ 'resumes' folder not found!")
+        print("❌ sample_data folder not found!")
         return
 
     files = [f for f in os.listdir(resume_folder) if f.endswith((".pdf", ".docx"))]
@@ -96,12 +122,10 @@ def main():
         print("❌ No resumes found!")
         return
 
-    # Load Job Description
-    try:
-        with open("data/job_description.txt", "r", encoding="utf-8") as f:
-            job_desc = clean_text(f.read())
-    except:
-        print("❌ Job description file missing!")
+    # Load job description
+    job_desc = load_job_description()
+
+    if job_desc == "":
         return
 
     resumes = []
@@ -143,11 +167,19 @@ def main():
     # Convert to %
     df["Score (%)"] = (df["Score"] * 100).round(2)
 
-    # Threshold (safe)
-    threshold = 0.2
+    # -------------------------------
+    # 🔥 SMART SHORTLIST LOGIC
+    # -------------------------------
+    threshold = 0.05  # lowered threshold
+
     df["Status"] = df["Score"].apply(
         lambda x: "Shortlisted" if x >= threshold else "Rejected"
     )
+
+    # ✅ Ensure at least top candidates are shortlisted
+    if (df["Status"] == "Shortlisted").sum() == 0:
+        print("⚠️ No one met threshold → forcing Top 3 as shortlisted")
+        df.loc[:2, "Status"] = "Shortlisted"
 
     print("\n📊 FINAL RESULTS:\n")
     print(df)
@@ -155,7 +187,7 @@ def main():
     # -------------------------------
     # OUTPUTS
     # -------------------------------
-    os.makedirs("outputs", exist_ok=True)
+    os.makedirs(output_folder, exist_ok=True)
 
     # Graph
     try:
@@ -166,35 +198,26 @@ def main():
         plt.title("Resume Screening Scores")
         plt.xticks(rotation=45)
         plt.tight_layout()
-        plt.savefig("outputs/score_chart.png")
+        plt.savefig(os.path.join(output_folder, "score_chart.png"))
         plt.close()
     except:
         print("⚠️ Graph not generated")
 
     # Save all results
-    df.to_csv("outputs/results.csv", index=False)
+    df.to_csv(os.path.join(output_folder, "results.csv"), index=False)
 
     # Shortlisted
     shortlisted = df[df["Status"] == "Shortlisted"]
+    shortlisted.to_csv(os.path.join(output_folder, "shortlisted.csv"), index=False)
 
-    # 🔥 FIX: if none shortlisted → take top 3 anyway
-    if shortlisted.empty:
-        print("⚠️ No one met threshold → selecting Top 3 instead")
-        shortlisted = df.head(3)
-
-    shortlisted.to_csv("outputs/shortlisted.csv", index=False)
-
-    # 🔥 GUARANTEED TOP CANDIDATES FILE
-    top_n = min(3, len(df))  # even if <3 resumes
+    # Top candidates
+    top_n = min(3, len(df))
     top_candidates = df.head(top_n)
+    top_candidates.to_csv(os.path.join(output_folder, "top_candidates.csv"), index=False)
 
-    if not top_candidates.empty:
-        top_candidates.to_csv("outputs/top_candidates.csv", index=False)
-        print("\n🏆 Top Candidates Saved!")
-    else:
-        print("❌ No candidates found!")
-
-    print("\n✅ ALL FILES GENERATED SUCCESSFULLY!")
+    print("\n🏆 Top Candidates Saved!")
+    print(f"\n📁 Files saved in: {output_folder}")
+    print("\n✅ ALL DONE!")
 
 
 # -------------------------------

@@ -1,0 +1,5 @@
+We are looking for a Data Scientist with strong skills in Python, Machine Learning, NLP, and SQL.
+
+The candidate should have experience in building machine learning models, data analysis, and working with real-world datasets.
+
+Knowledge of deep learning and natural language processing is a plus.
