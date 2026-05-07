@@ -75,18 +75,20 @@ resume-screening-ai/
 ## ▶️ Getting Started
 
 1️⃣ Clone the Repository
-
-git clone https://github.com/your-username/resume-screening-ai.git
+```
+git clone https://github.com/needhi-x/resume-screening-ai.git
 cd resume-screening-ai
-
+```
 2️⃣ Install Dependencies
-
+```
 pip install -r requirements.txt
 
+```
 3️⃣ Run the Project
-
+```
 python main.py
 
+```
 ---
 
 ## 📊 Output Generated
@@ -110,11 +112,11 @@ After execution, the system creates:
 ### 🔹 Shortlisted Candidates
 ![Shortlisted](images/shortlisted.png)
 
-### 🔹 Score Visualization
-![Chart](images/score_chart.png)
-
 ### 🔹 Top Candidates
 ![Top](images/top_candidates.png)
+
+### 🔹 Score Visualization
+![Chart](images/score_chart.png)
 
 ---
 
