@@ -7,6 +7,7 @@ An intelligent Resume Screening System that leverages Natural Language Processin
 ## 📌 Overview
 
 Recruiters often spend hours manually reviewing resumes.
+
 This project automates that process by analyzing resumes and identifying the most relevant candidates using TF-IDF vectorization and Cosine Similarity.
 
 It simulates a real-world Applicant Tracking System (ATS) used in modern hiring pipelines.
@@ -54,11 +55,11 @@ resume-screening-ai/
 │
 ├── data/
 │   └── sample_job_description.txt
-│
-├── sample_data/
-│   ├── resume1.pdf
-│   ├── resume2.pdf
-│   └── resume3.docx
+│   └──sample_resumes/
+│      ├── resume1.pdf
+│      ├── resume2.pdf
+│      └── resume3.pdf
+│      └── resume4.pdf
 │
 ├── sample_outputs/
 │   ├── results.csv
